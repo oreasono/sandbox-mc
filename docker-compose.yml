@@ -1,0 +1,91 @@
+services:
+  # Minecraft Server (Java Edition)
+  mc-server:
+    image: itzg/minecraft-server:java21
+    container_name: minecraft-server
+    environment:
+      EULA: "TRUE"
+      VERSION: "1.21.4"
+      TYPE: "VANILLA"
+      DIFFICULTY: "peaceful"
+      MODE: "creative"
+      # Allow bots to connect without Microsoft authentication
+      ONLINE_MODE: "FALSE"
+      # Server configuration
+      MAX_PLAYERS: "5"
+      MOTD: "Claude's Minecraft World"
+      SPAWN_PROTECTION: "0"
+      ALLOW_FLIGHT: "TRUE"
+      # Memory settings
+      MEMORY: "2G"
+      # Enable RCON for remote management (optional)
+      ENABLE_RCON: "true"
+      RCON_PASSWORD: "claudemc"
+      RCON_PORT: "25575"
+    ports:
+      - "25565:25565"
+      - "25575:25575"
+    volumes:
+      - mc-server-data:/data
+    networks:
+      - minecraft-net
+    restart: unless-stopped
+    healthcheck:
+      test: mc-health
+      start_period: 1m
+      interval: 5s
+      retries: 20
+
+  # Claude Code + Minecraft Client Container
+  claude-client:
+    build:
+      context: .
+      dockerfile: Dockerfile.claude-mc
+    container_name: claude-minecraft-client
+    environment:
+      # Display settings
+      DISPLAY_WIDTH: "1920"
+      DISPLAY_HEIGHT: "1080"
+      # VNC settings (set VNC_PASSWORD for security)
+      VNC_PASSWORD: ""
+      # User settings
+      USER_ID: "1000"
+      GROUP_ID: "1000"
+      # Minecraft MCP Server settings
+      MC_SERVER_HOST: "mc-server"
+      MC_SERVER_PORT: "25565"
+      MC_BOT_USERNAME: "ClaudeBot"
+      # Claude Code API key (set via .env file or command line)
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      # Software rendering for container
+      LIBGL_ALWAYS_SOFTWARE: "1"
+    ports:
+      # VNC web access
+      - "5800:5800"
+      # VNC direct access
+      - "5900:5900"
+    volumes:
+      # Persistent Minecraft data
+      - mc-client-data:/config/.minecraft
+      # Persistent Claude data
+      - claude-data:/config/.claude
+    networks:
+      - minecraft-net
+    depends_on:
+      mc-server:
+        condition: service_healthy
+    restart: unless-stopped
+    # Increase shared memory for graphics
+    shm_size: "1gb"
+
+networks:
+  minecraft-net:
+    driver: bridge
+
+volumes:
+  mc-server-data:
+    name: minecraft-server-data
+  mc-client-data:
+    name: minecraft-client-data
+  claude-data:
+    name: claude-code-data
