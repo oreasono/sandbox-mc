@@ -1,17 +1,17 @@
-# Claude Code + Minecraft Client Container
-# Based on jlesage/baseimage-gui for VNC support
+# Claude Code + Minecraft MCP Server Container
+# VNC terminal for running Claude Code with Minecraft MCP integration
+# The Minecraft client runs on the host machine (HMCL) to observe the bot
 
 FROM jlesage/baseimage-gui:ubuntu-22.04-v4
 
 # Build arguments
-ARG MINECRAFT_VERSION=1.21.4
 ARG NODE_VERSION=22
 
 # Environment variables
-ENV APP_NAME="Minecraft-Claude"
+ENV APP_NAME="Claude-Minecraft"
 ENV KEEP_APP_RUNNING=1
-ENV DISPLAY_WIDTH=1920
-ENV DISPLAY_HEIGHT=1080
+ENV DISPLAY_WIDTH=1280
+ENV DISPLAY_HEIGHT=800
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,38 +22,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
-    software-properties-common \
     git \
     jq \
-    # Java 21 (for Minecraft)
+    # Java 21 (for MCP server / Mineflayer)
     openjdk-21-jre-headless \
-    # Graphics/OpenGL support
-    libgl1-mesa-glx \
-    libgl1-mesa-dri \
-    mesa-utils \
-    libopengl0 \
-    libglx-mesa0 \
-    # Audio support
-    libasound2 \
-    pulseaudio \
-    # GTK and fonts (for Minecraft launcher)
-    libgtk-3-0 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxrandr2 \
-    libgbm1 \
-    libpango-1.0-0 \
-    libcairo2 \
+    # Terminal emulator
+    xfce4-terminal \
+    dbus-x11 \
+    # Fonts
     fonts-dejavu \
     fonts-liberation \
-    # X11 utilities
-    xdotool \
-    x11-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Generate UTF-8 locale
@@ -65,7 +43,7 @@ ENV LANG=en_US.UTF-8
 ENV LC_ALL=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 
-# Install Node.js 22
+# Install Node.js
 RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -73,17 +51,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash - \
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
-# Install terminal emulator for VNC display
-# Note: Official MC launcher doesn't support ARM64. The MCP bot (Mineflayer) is headless
-# and works without visual client. Connect your local MC client to watch the bot.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    xfce4-terminal \
-    dbus-x11 \
-    && rm -rf /var/lib/apt/lists/*
-
 # Create app directories
 RUN mkdir -p /app/minecraft-mcp-server \
-    && mkdir -p /config/.minecraft \
     && mkdir -p /config/.claude
 
 # Copy minecraft-mcp-server source
@@ -93,7 +62,7 @@ COPY minecraft-mcp-server/ /app/minecraft-mcp-server/
 WORKDIR /app/minecraft-mcp-server
 RUN npm ci && npm run build
 
-# Copy startup scripts and set permissions
+# Copy startup scripts
 COPY --chmod=755 scripts/startapp.sh /startapp.sh
 COPY --chmod=755 scripts/start-mcp-server.sh /app/start-mcp-server.sh
 
@@ -101,24 +70,23 @@ COPY --chmod=755 scripts/start-mcp-server.sh /app/start-mcp-server.sh
 RUN ln -s /app/start-mcp-server.sh /usr/local/bin/start-mcp
 
 # Create Claude Code MCP configuration
-# ~/.claude.json for user scope, .mcp.json for project scope
 RUN mkdir -p /config/.claude /app/.claude && \
     echo '{"mcpServers":{"minecraft":{"type":"stdio","command":"node","args":["/app/minecraft-mcp-server/dist/main.js","--host","mc-server","--port","25565","--username","ClaudeBot"]}}}' > /config/.claude.json && \
     echo '{"mcpServers":{"minecraft":{"type":"stdio","command":"node","args":["/app/minecraft-mcp-server/dist/main.js","--host","mc-server","--port","25565","--username","ClaudeBot"]}}}' > /app/.mcp.json && \
     chown 1000:1000 /config/.claude.json /app/.mcp.json /app/.claude
 
-# Create CLAUDE.md guide for the agent
+# Copy CLAUDE.md guide for the agent
 COPY --chmod=644 --chown=1000:1000 CLAUDE.md /app/CLAUDE.md
 
 # Set working directory
 WORKDIR /app
 
-# Expose VNC ports (already exposed by base image, but explicit)
+# Expose VNC ports
 EXPOSE 5800 5900
 
 # Volume for persistent data
 VOLUME ["/config"]
 
 # Labels
-LABEL org.opencontainers.image.title="Claude Minecraft Container"
-LABEL org.opencontainers.image.description="Minecraft client with Claude Code and MCP server for AI gameplay"
+LABEL org.opencontainers.image.title="Claude Minecraft MCP"
+LABEL org.opencontainers.image.description="Claude Code with Minecraft MCP server - use host HMCL client to observe"

@@ -1,0 +1,18 @@
+# HMCL Launcher
+.hmcl/
+HMCL-*.jar
+
+# Minecraft client data
+.minecraft/
+
+# MCP server (external repo)
+minecraft-mcp-server/
+
+# Environment variables (contains API keys)
+.env
+
+# Docker volumes
+data/
+
+# OS files
+.DS_Store
