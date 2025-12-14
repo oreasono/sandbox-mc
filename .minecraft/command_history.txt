@@ -1,6 +1,0 @@
-/m
-/msg
-/msg ClaudeBot hi
-/list
-/
-/help
